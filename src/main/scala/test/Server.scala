@@ -6,7 +6,6 @@ import java.nio.file.{Files, Path, Paths}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{StatusCodes, HttpResponse, HttpEntity, Multipart}
-import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.{Materializer, ActorMaterializer}
@@ -62,7 +61,7 @@ object Server {
             extractRequest { request =>
               complete {
                 for {
-                  multiPartFormData <- Unmarshal(request.entity).to[FormData]
+                  multiPartFormData <- Unmarshal(request.entity).to[Multipart.FormData]
                   splitParts <- multiPartFormData.parts.prefixAndTail(2).runWith(Sink.head)
                   (bundleConfPart, remainingParts) = extractBundleConf(splitParts)
                   bundleConfSaved <- writeToFile(bundleConfPart.entity, workDir)

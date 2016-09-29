@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpEntity, Multipart}
+import akka.http.scaladsl.model.{StatusCodes, HttpResponse, HttpEntity, Multipart}
 import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshal
@@ -75,9 +75,9 @@ object Server {
                   println("")
 
                   if (fileContent.nonEmpty)
-                    bundleConfSaved.toAbsolutePath.toString
+                    HttpResponse(StatusCodes.OK, entity = bundleConfSaved.toAbsolutePath.toString)
                   else
-                    throw new RuntimeException("Uploaded bundle.conf is empty, but there should be some content")
+                    HttpResponse(StatusCodes.InternalServerError, entity = "Uploaded bundle.conf is empty, but there should be some content")
                 }
               }
             }

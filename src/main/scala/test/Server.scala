@@ -40,9 +40,12 @@ object Server {
       println(s"About to write bundle.conf to [$tempFilePath] ...")
       requestEntity.dataBytes
         .runWith(tempFileSink)
-        .map { _ =>
-          println(s"Written bundle.conf to [$tempFilePath]")
-          tempFilePath
+        .map { result =>
+          if (result.wasSuccessful) {
+            println(s"Written bundle.conf to [$tempFilePath]")
+            tempFilePath
+          } else
+            throw result.getError
         }
     }
 

@@ -28,14 +28,14 @@ object Server {
     def extractBundleConf(splitParts: (Seq[Multipart.FormData.BodyPart], Source[Multipart.FormData.BodyPart, _])): (Multipart.FormData.BodyPart, Source[Multipart.FormData.BodyPart, _]) = {
       println("Extracting bundle.conf from the body parts")
       splitParts match {
-        case (Seq(bundleConfPart, bundlePart), remainingParts) =>
+        case (Seq(bundleConfPart), remainingParts) =>
           println("Extracting bundle.conf from the body parts - combining remaining parts as one source")
-          bundleConfPart -> (Source.single(bundlePart) ++ remainingParts)
+          bundleConfPart -> remainingParts
       }
     }
 
-    def writeToFile(requestEntity: HttpEntity, destDir: Path)(implicit ec: ExecutionContext, materializer: Materializer): Future[Path] = {
-      val tempFilePath = createTempBundleConf(destDir).toPath
+    def writeToFile(requestEntity: HttpEntity, destDir: Path, fileName: String)(implicit ec: ExecutionContext, materializer: Materializer): Future[Path] = {
+      val tempFilePath = createTempFile(destDir, fileName).toPath
       val tempFileSink = FileIO.toPath(tempFilePath)
       println(s"About to write bundle.conf to [$tempFilePath] ...")
       requestEntity.dataBytes
@@ -49,9 +49,9 @@ object Server {
         }
     }
 
-    def createTempBundleConf(destDir: Path): File = {
+    def createTempFile(destDir: Path, fileName: String): File = {
       Files.createDirectories(destDir)
-      val bundleConf = destDir.resolve("bundle.conf")
+      val bundleConf = destDir.resolve(fileName)
       Files.deleteIfExists(bundleConf)
       Files.createFile(bundleConf).toFile
     }
@@ -65,15 +65,27 @@ object Server {
               complete {
                 for {
                   multiPartFormData <- Unmarshal(request.entity).to[Multipart.FormData]
-                  splitParts <- multiPartFormData.parts.prefixAndTail(2).runWith(Sink.head)
+                  splitParts <- multiPartFormData.parts.prefixAndTail(1).runWith(Sink.head)
                   (bundleConfPart, remainingParts) = extractBundleConf(splitParts)
-                  bundleConfSaved <- writeToFile(bundleConfPart.entity, workDir)
-                  _ <- remainingParts.runWith(Sink.ignore)
+
+                  // When consuming multipart, it's important to materialize substream from entity bytes before moving on
+                  // to the next bodypart. If this is not done, we will have substream timeout error.
+                  bundleConfSaved <- writeToFile(bundleConfPart.entity, workDir, "saved-bundle.conf")
+
+                  (secondPart, rest) <- remainingParts.prefixAndTail(1).runWith(Sink.head)
+
+                  bundleZipSaved <- writeToFile(secondPart.head.entity, workDir, "saved-bundle.zip")
+
+                  _ <- rest.map(_.entity.dataBytes.runWith(Sink.ignore)).runWith(Sink.ignore)
                 } yield {
                   // I know using Source.fromFile is horrid, but I'm just trying to do something quick to display the saved bundle.conf contents
                   val fileContent = scala.io.Source.fromFile(bundleConfSaved.toFile).getLines().mkString("\n")
                   println("Saved bundle.conf:")
                   println(fileContent)
+                  println("")
+
+                  println("Saved bundle zip location:")
+                  println(bundleZipSaved.toAbsolutePath)
                   println("")
 
                   if (fileContent.nonEmpty)

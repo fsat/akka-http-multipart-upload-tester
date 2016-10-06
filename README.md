@@ -1,10 +1,10 @@
-# Repro for Akka HTTP Multipart Upload
+# Repro for Akka HTTP Multipart Upload + Download
 
-## Setup
+## Setup for Multipart Upload
 
 * Open 2 terminals.
 * Run the server on the first terminal: `sbt "run-main test.Server"`
-* Run the client on the second terminal: `sbt "run-main test.Client"`
+* Run the client on the second terminal: `sbt "run-main test.ClientUpload"`
 
 ## Observation
 
@@ -58,8 +58,6 @@ akka.stream.impl.SubscriptionTimeoutException: Substream Source has not been mat
 	at scala.concurrent.forkjoin.ForkJoinPool.runWorker(ForkJoinPool.java:1979)
 	at scala.concurrent.forkjoin.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:107)
 ```
-
-* Despite the error, writing to the file is completed resulting in an empty file.
 
 ## Comparison with curl
 

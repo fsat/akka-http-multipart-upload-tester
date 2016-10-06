@@ -5,7 +5,9 @@ import java.nio.file.{Files, Path, Paths}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{StatusCodes, HttpResponse, HttpEntity, Multipart}
+import akka.http.scaladsl.marshalling.Marshal
+import akka.http.scaladsl.model.HttpEntity.IndefiniteLength
+import akka.http.scaladsl.model.{MediaTypes, StatusCodes, HttpResponse, HttpEntity, Multipart}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.{Materializer, ActorMaterializer}
@@ -60,28 +62,47 @@ object Server {
     // format: OFF
       val route =
         pathPrefix("test") {
-          post {
-            extractRequest { request =>
-              complete {
-                for {
-                  multiPartFormData <- Unmarshal(request.entity).to[Multipart.FormData]
-                  splitParts <- multiPartFormData.parts.prefixAndTail(2).runWith(Sink.head)
-                  (bundleConfPart, remainingParts) = extractBundleConf(splitParts)
-                  bundleConfSaved <- writeToFile(bundleConfPart.entity, workDir)
-                  _ <- remainingParts.runWith(Sink.ignore)
-                } yield {
-                  // I know using Source.fromFile is horrid, but I'm just trying to do something quick to display the saved bundle.conf contents
-                  val fileContent = scala.io.Source.fromFile(bundleConfSaved.toFile).getLines().mkString("\n")
-                  println("Saved bundle.conf:")
-                  println(fileContent)
-                  println("")
+          pathPrefix("upload") {
+            post {
+              extractRequest { request =>
+                complete {
+                  for {
+                    multiPartFormData <- Unmarshal(request.entity).to[Multipart.FormData]
+                    splitParts <- multiPartFormData.parts.prefixAndTail(2).runWith(Sink.head)
+                    (bundleConfPart, remainingParts) = extractBundleConf(splitParts)
+                    bundleConfSaved <- writeToFile(bundleConfPart.entity, workDir)
+                    _ <- remainingParts.runWith(Sink.ignore)
+                  } yield {
+                    // I know using Source.fromFile is horrid, but I'm just trying to do something quick to display the saved bundle.conf contents
+                    val fileContent = scala.io.Source.fromFile(bundleConfSaved.toFile).getLines().mkString("\n")
+                    println("Saved bundle.conf:")
+                    println(fileContent)
+                    println("")
 
-                  if (fileContent.nonEmpty)
-                    HttpResponse(StatusCodes.OK, entity = bundleConfSaved.toAbsolutePath.toString)
-                  else
-                    HttpResponse(StatusCodes.InternalServerError, entity = "Uploaded bundle.conf is empty, but there should be some content")
+                    if (fileContent.nonEmpty)
+                      HttpResponse(StatusCodes.OK, entity = bundleConfSaved.toAbsolutePath.toString)
+                    else
+                      HttpResponse(StatusCodes.InternalServerError, entity = "Uploaded bundle.conf is empty, but there should be some content")
+                  }
                 }
               }
+            }
+          } ~
+          pathPrefix("download") {
+            val multiPartForm = Multipart.FormData(Source(List(
+              Multipart.FormData.BodyPart(
+                "bundle",
+                IndefiniteLength(MediaTypes.`application/octet-stream`, FileIO.fromPath(TestData.Bundle)),
+                Map("filename" -> s"${TestData.Bundle.getFileName}")
+              ),
+              Multipart.FormData.BodyPart(
+                "configuration",
+                IndefiniteLength(MediaTypes.`application/octet-stream`, FileIO.fromPath(TestData.Bundle)),
+                Map("filename" -> s"${TestData.Bundle.getFileName}")
+              )
+            )))
+            complete {
+              Marshal(multiPartForm).to[HttpResponse]
             }
           }
         }

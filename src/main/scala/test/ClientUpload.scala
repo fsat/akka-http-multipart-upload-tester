@@ -15,7 +15,7 @@ import scala.concurrent.{Future, ExecutionContext, Await}
 import scala.concurrent.duration._
 import scala.util.Try
 
-object Client {
+object ClientUpload {
 
   private val targetUrl =
     sys.props.get("test.url").map(new URL(_)).getOrElse(TestData.DefaultUrl)
@@ -25,7 +25,8 @@ object Client {
     println(s"Uploading bundle.conf from [${TestData.BundleConf}]")
     println(s"Uploading bundle from [${TestData.Bundle}]")
 
-    println(s"Uploading to [$targetUrl]")
+    val uploadUrl = new URL(s"$targetUrl/upload")
+    println(s"Uploading to [$uploadUrl]")
 
     val multiPartForm = Multipart.FormData(Source(List(
       Multipart.FormData.BodyPart(
@@ -42,10 +43,10 @@ object Client {
 
     val requestEntity = Await.result(Marshal(multiPartForm).to[RequestEntity], 3.seconds)
 
-    val request = Post(s"$targetUrl", requestEntity)
+    val request = Post(s"$uploadUrl", requestEntity)
 
     Source.single(request)
-      .via(http.outgoingConnection(targetUrl.getHost, targetUrl.getPort))
+      .via(http.outgoingConnection(uploadUrl.getHost, uploadUrl.getPort))
       .runWith(Sink.head)
   }
 

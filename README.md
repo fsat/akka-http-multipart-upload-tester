@@ -59,8 +59,6 @@ akka.stream.impl.SubscriptionTimeoutException: Substream Source has not been mat
 	at scala.concurrent.forkjoin.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:107)
 ```
 
-* Despite the error, writing to the file is completed resulting in an empty file.
-
 ## Comparison with curl
 
 Upload using `curl` is completed successfully.
